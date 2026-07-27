@@ -95,6 +95,10 @@ ixp_freefcall(IxpFcall *fcall) {
 		free(fcall->error.ename);
 		fcall->error.ename = nil;
 		break;
+	case TCreate:
+		free(fcall->tcreate.extension);
+		fcall->tcreate.extension = nil;
+		break;
 	}
 }
 
