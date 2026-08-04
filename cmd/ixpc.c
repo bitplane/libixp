@@ -286,6 +286,7 @@ xls(int argc, char *argv[]) {
 	buf = emalloc(fid->iounit);
 	while((count = ixp_read(fid, buf, fid->iounit)) > 0) {
 		m = ixp_message(buf, count, MsgUnpack);
+		m.version = client->version;
 		while(!m.error && m.pos < m.end) {
 			if(nstat == mstat) {
 				mstat <<= 1;

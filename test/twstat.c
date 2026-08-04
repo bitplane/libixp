@@ -9,7 +9,7 @@ le16(const unsigned char *p) {
 }
 
 static void
-check(const char *name) {
+check(const char *name, unsigned version) {
 	unsigned char buf[512];
 	IxpFcall f = {0};
 	IxpMsg msg;
@@ -21,10 +21,14 @@ check(const char *name) {
 	f.twstat.stat.uid = "";
 	f.twstat.stat.gid = "";
 	f.twstat.stat.muid = "";
+	f.twstat.stat.extension = "target";
 	msg = ixp_message((char*)buf, sizeof buf, MsgPack);
+	msg.version = version;
 	n = ixp_fcall2msg(&msg, &f);
 	/* Stat: size, type, dev, qid, mode, times, length, strings. */
 	statlen = 2 + 2 + 4 + 13 + 4 + 4 + 4 + 8 + 8 + strlen(name);
+	if(version == IXP_V9P2000U)
+		statlen += 2 + strlen("target") + 12;
 	assert(n == 4 + 1 + 2 + 4 + 2 + statlen);
 	assert(le16(buf + 11) == statlen);
 	assert(le16(buf + 13) == statlen - 2);
@@ -32,7 +36,9 @@ check(const char *name) {
 
 int
 main(void) {
-	check("");
-	check("renamed-file");
+	check("", IXP_V9P2000);
+	check("renamed-file", IXP_V9P2000);
+	check("", IXP_V9P2000U);
+	check("renamed-file", IXP_V9P2000U);
 	return 0;
 }

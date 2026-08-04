@@ -585,14 +585,20 @@ ixp_srv_readdir(Ixp9Req *req, IxpLookupFn lookup, void (*dostat)(IxpStat*, IxpFi
 		size = req->fid->iounit;
 	buf = emallocz(size);
 	msg = ixp_message(buf, size, MsgPack);
+	msg.version = ixp_req_getversion(req);
 
 	file = lookup(file, nil);
 	tfile = file;
 	/* Note: The first file is ".", so we skip it. */
 	offset = 0;
 	for(file=file->next; file; file=file->next) {
+		memset(&stat, 0, sizeof stat);
+		stat.extension = "";
+		stat.n_uid = ~0U;
+		stat.n_gid = ~0U;
+		stat.n_muid = ~0U;
 		dostat(&stat, file);
-		n = ixp_sizeof_stat(&stat);
+		n = ixp_sizeof_stat(&stat, msg.version);
 		if(offset >= req->ifcall.io.offset) {
 			if(size < n)
 				break;
