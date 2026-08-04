@@ -193,7 +193,7 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
 		}
 		msg->pos = s;
 		size += *num;
-		s = emalloc(size);
+		s = *num ? emalloc(size) : nil;
 	}
 
 	for(i=0; i < *num; i++) {
