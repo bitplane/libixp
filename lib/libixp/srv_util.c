@@ -591,8 +591,13 @@ ixp_srv_readdir(Ixp9Req *req, IxpLookupFn lookup, void (*dostat)(IxpStat*, IxpFi
 	/* Note: The first file is ".", so we skip it. */
 	offset = 0;
 	for(file=file->next; file; file=file->next) {
+		memset(&stat, 0, sizeof stat);
+		stat.extension = "";
+		stat.n_uid = ~0U;
+		stat.n_gid = ~0U;
+		stat.n_muid = ~0U;
 		dostat(&stat, file);
-		n = ixp_sizeof_stat(&stat);
+		n = ixp_sizeof_stat(&stat, ixp_req_getversion(req));
 		if(offset >= req->ifcall.io.offset) {
 			if(size < n)
 				break;
