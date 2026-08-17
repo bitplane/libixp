@@ -27,7 +27,8 @@
  * structure for the connection as their sole argument.
  *
  * Returns:
- *	Returns the connection's new IxpConn data structure.
+ *	Returns the connection's new IxpConn data structure, or nil if the
+ *	descriptor cannot be represented by select(2).
  *
  * See also:
  *	F<ixp_serverloop>, F<ixp_serve9conn>, F<ixp_hangup>
@@ -38,6 +39,11 @@ ixp_listen(IxpServer *srv, int fd, void *aux,
 		void (*close)(IxpConn*)
 		) {
 	IxpConn *c;
+
+	if(fd < 0 || fd >= FD_SETSIZE) {
+		werrstr("file descriptor outside select range");
+		return nil;
+	}
 
 	c = emallocz(sizeof *c);
 	c->fd = fd;
@@ -98,6 +104,7 @@ prepare_select(IxpServer *s) {
 	IxpConn *c;
 
 	FD_ZERO(&s->rd);
+	s->maxfd = -1;
 	for(c = s->conn; c; c = c->next)
 		if(c->read) {
 			if(s->maxfd < c->fd)

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "ixp_local.h"
 
 static void handlereq(Ixp9Req *r);
@@ -620,5 +621,8 @@ ixp_serve9conn_fd(IxpServer *srv, int fd, Ixp9Srv *p9srv) {
 	thread->initmutex(&p9conn->rlock);
 	thread->initmutex(&p9conn->wlock);
 
-	ixp_listen(srv, fd, p9conn, handlefcall, cleanupconn);
+	if(ixp_listen(srv, fd, p9conn, handlefcall, cleanupconn) == nil) {
+		close(fd);
+		decref_p9conn(p9conn);
+	}
 }
