@@ -182,6 +182,12 @@ ixp_mountfd(int fd) {
 		return nil;
 	}
 
+	if(fcall.version.msize < 24) {
+		werrstr("server msize too small");
+		ixp_freefcall(&fcall);
+		ixp_unmount(c);
+		return nil;
+	}
 	if(fcall.version.msize > IXP_MAX_MSG) {
 		werrstr("server msize too large");
 		ixp_freefcall(&fcall);

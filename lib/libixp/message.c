@@ -79,6 +79,33 @@ ixp_freestat(IxpStat *s) {
 void
 ixp_freefcall(IxpFcall *fcall) {
 	switch(fcall->hdr.type) {
+	case TAuth:
+		free(fcall->tauth.uname);
+		free(fcall->tauth.aname);
+		fcall->tauth.uname = fcall->tauth.aname = nil;
+		break;
+	case TAttach:
+		free(fcall->tattach.uname);
+		free(fcall->tattach.aname);
+		fcall->tattach.uname = fcall->tattach.aname = nil;
+		break;
+	case TWalk:
+		if(fcall->twalk.nwname)
+			free(fcall->twalk.wname[0]);
+		fcall->twalk.nwname = 0;
+		break;
+	case TCreate:
+		free(fcall->tcreate.name);
+		free(fcall->tcreate.extension);
+		fcall->tcreate.name = fcall->tcreate.extension = nil;
+		break;
+	case TWrite:
+		free(fcall->twrite.data);
+		fcall->twrite.data = nil;
+		break;
+	case TWStat:
+		ixp_freestat(&fcall->twstat.stat);
+		break;
 	case RStat:
 		free(fcall->rstat.stat);
 		fcall->rstat.stat = nil;
@@ -87,6 +114,7 @@ ixp_freefcall(IxpFcall *fcall) {
 		free(fcall->rread.data);
 		fcall->rread.data = nil;
 		break;
+	case TVersion:
 	case RVersion:
 		free(fcall->version.version);
 		fcall->version.version = nil;
@@ -94,10 +122,6 @@ ixp_freefcall(IxpFcall *fcall) {
 	case RError:
 		free(fcall->error.ename);
 		fcall->error.ename = nil;
-		break;
-	case TCreate:
-		free(fcall->tcreate.extension);
-		fcall->tcreate.extension = nil;
 		break;
 	}
 }
@@ -242,6 +266,8 @@ uint
 ixp_fcall2msg(IxpMsg *msg, IxpFcall *fcall) {
 	uint32_t size;
 
+	if(msg->size < SDWord)
+		return 0;
 	msg->end = msg->data + msg->size;
 	msg->pos = msg->data + SDWord;
 	msg->mode = MsgPack;
@@ -262,6 +288,8 @@ ixp_fcall2msg(IxpMsg *msg, IxpFcall *fcall) {
 
 uint
 ixp_msg2fcall(IxpMsg *msg, IxpFcall *fcall) {
+	if(msg->size < SDWord || msg->end < msg->data + SDWord)
+		return 0;
 	msg->pos = msg->data + SDWord;
 	msg->mode = MsgUnpack;
 	ixp_pfcall(msg, fcall);
@@ -271,4 +299,3 @@ ixp_msg2fcall(IxpMsg *msg, IxpFcall *fcall) {
 
 	return msg->pos - msg->data;
 }
-
