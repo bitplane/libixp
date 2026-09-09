@@ -363,7 +363,7 @@ ixp_pending_write(IxpPending *pending, const char *dat, long ndat) {
 	IxpRequestLink req_link;
 	IxpQueue **qp, *queue;
 	IxpPendingLink *pp;
-	IxpRequestLink *rp;
+	Ixp9Req *req;
 
 	if(ndat == 0)
 		return;
@@ -396,8 +396,10 @@ ixp_pending_write(IxpPending *pending, const char *dat, long ndat) {
 	req_link.prev->next = &req_link;
 	req_link.next->prev = &req_link;
 
-	while((rp = req_link.next) != &req_link)
-		ixp_pending_respond(rp->req);
+	while(req_link.next != &req_link) {
+		req = req_link.next->req;
+		ixp_pending_respond(req);
+	}
 }
 
 int
