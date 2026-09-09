@@ -113,7 +113,9 @@ announce_unix(char *file) {
 	const int yes = 1;
 	sockaddr_un sa;
 	socklen_t salen;
-	int fd;
+	int bound, error, fd;
+
+	bound = 0;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -124,18 +126,25 @@ announce_unix(char *file) {
 	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*)&yes, sizeof yes) < 0)
 		goto fail;
 
-	unlink(file);
+	if(unlink(file) < 0 && errno != ENOENT)
+		goto fail;
 	if(bind(fd, (sockaddr*)&sa, salen) < 0)
 		goto fail;
+	bound = 1;
 
-	chmod(file, S_IRWXU);
+	if(chmod(file, S_IRWXU) < 0)
+		goto fail;
 	if(listen(fd, IXP_MAX_CACHE) < 0)
 		goto fail;
 
 	return fd;
 
 fail:
+	error = errno;
 	close(fd);
+	if(bound)
+		unlink(file);
+	errno = error;
 	return -1;
 }
 
