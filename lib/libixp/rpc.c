@@ -54,18 +54,19 @@ freemuxrpc(IxpRpc *r)
 static int
 sendrpc(IxpRpc *r, IxpFcall *f)
 {
-	int ret;
+	int ret, tag;
 	IxpClient *mux;
 	
 	ret = 0;
 	mux = r->mux;
 	/* assign the tag, add selves to response queue */
 	thread->lock(&mux->lk);
-	r->tag = gettag(mux, r);
-	if(r->tag < 0) {
+	tag = gettag(mux, r);
+	if(tag < 0) {
 		thread->unlock(&mux->lk);
 		return -1;
 	}
+	r->tag = (uint)tag;
 	f->hdr.tag = r->tag;
 	enqueue(mux, r);
 	thread->unlock(&mux->lk);
