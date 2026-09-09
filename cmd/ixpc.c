@@ -195,7 +195,7 @@ xcreate(int argc, char *argv[]) {
 	if(fid == nil)
 		fatal("Can't create file '%s': %s\n", file, ixp_errbuf());
 
-	if((fid->qid.type&P9_DMDIR) == 0)
+	if((fid->qid.type&P9_QTDIR) == 0)
 		write_data(fid, file);
 
 	return 0;
