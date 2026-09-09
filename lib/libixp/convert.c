@@ -17,7 +17,8 @@ enum {
 
 static int
 available(IxpMsg *msg, uint size) {
-	return msg->pos <= msg->end && size <= (uint)(msg->end - msg->pos);
+	return !msg->error && msg->pos <= msg->end
+		&& size <= (uint)(msg->end - msg->pos);
 }
 
 static void
@@ -25,13 +26,13 @@ skip(IxpMsg *msg, uint size) {
 	if(available(msg, size))
 		msg->pos += size;
 	else
-		msg->pos = msg->end + 1;
+		msg->error = 1;
 }
 
 static void
 ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
 	uint8_t *pos;
-	int v;
+	uint32_t v;
 
 	if(available(msg, size)) {
 		pos = (uint8_t*)msg->pos;
@@ -42,8 +43,10 @@ ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
 			case SDWord:
 				pos[3] = v>>24;
 				pos[2] = v>>16;
+				/* fall through */
 			case SWord:
 				pos[1] = v>>8;
+				/* fall through */
 			case SByte:
 				pos[0] = v;
 				break;
@@ -53,10 +56,12 @@ ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
 			v = 0;
 			switch(size) {
 			case SDWord:
-				v |= pos[3]<<24;
+				v |= (uint32_t)pos[3]<<24;
 				v |= pos[2]<<16;
+				/* fall through */
 			case SWord:
 				v |= pos[1]<<8;
+				/* fall through */
 			case SByte:
 				v |= pos[0];
 				break;
@@ -89,17 +94,19 @@ ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
  */
 void
 ixp_pu8(IxpMsg *msg, uint8_t *val) {
-	uint32_t v;
+	uint32_t v = 0;
 
-	v = *val;
+	if(msg->mode == MsgPack)
+		v = *val;
 	ixp_puint(msg, SByte, &v);
 	*val = (uint8_t)v;
 }
 void
 ixp_pu16(IxpMsg *msg, uint16_t *val) {
-	uint32_t v;
+	uint32_t v = 0;
 
-	v = *val;
+	if(msg->mode == MsgPack)
+		v = *val;
 	ixp_puint(msg, SWord, &v);
 	*val = (uint16_t)v;
 }
@@ -109,10 +116,12 @@ ixp_pu32(IxpMsg *msg, uint32_t *val) {
 }
 void
 ixp_pu64(IxpMsg *msg, uint64_t *val) {
-	uint32_t vl, vb;
+	uint32_t vl = 0, vb = 0;
 
-	vl = (uint)*val;
-	vb = (uint)(*val>>32);
+	if(msg->mode == MsgPack) {
+		vl = (uint)*val;
+		vb = (uint)(*val>>32);
+	}
 	ixp_puint(msg, SDWord, &vl);
 	ixp_puint(msg, SDWord, &vb);
 	*val = vl | ((uint64_t)vb<<32);
@@ -133,7 +142,7 @@ ixp_pu64(IxpMsg *msg, uint64_t *val) {
  * string packed at P<msg>->pos. In either case, P<msg>->pos is
  * advanced by the number of bytes read or written. If the
  * action would advance P<msg>->pos beyond P<msg>->end,
- * P<msg>->pos is still advanced but no other action is taken.
+ * P<msg>->error is set and no other action is taken.
  *
  * See also:
  *	T<IxpMsg>, F<ixp_pstrings>, F<ixp_pdata>
@@ -145,7 +154,7 @@ ixp_pstring(IxpMsg *msg, char **s) {
 	if(msg->mode == MsgPack)
 		len = strlen(*s);
 	ixp_pu16(msg, &len);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 
 	if(available(msg, len)) {
@@ -175,10 +184,9 @@ ixp_pstring(IxpMsg *msg, char **s) {
  * and P<(*strings)[0]> must be freed by the user. In either
  * case, P<msg>->pos is advanced by the number of bytes read or
  * written. If the action would advance P<msg>->pos beyond
- * P<msg>->end, P<msg>->pos is still advanced, but no other
- * action is taken. If P<*num> is greater than P<max>,
- * P<msg>->pos is set beyond P<msg>->end and no other action is
- * taken.
+ * P<msg>->end, P<msg>->error is set and no other action is
+ * taken. If P<*num> is greater than P<max>, P<msg>->error is
+ * set and no other action is taken.
  * 
  * See also:
  *	P<IxpMsg>, P<ixp_pstring>, P<ixp_pdata>
@@ -190,10 +198,10 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
 	uint16_t len;
 
 	ixp_pu16(msg, num);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 	if(*num > max) {
-		msg->pos = msg->end+1;
+		msg->error = 1;
 		return;
 	}
 
@@ -206,7 +214,7 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
 			ixp_pu16(msg, &len);
 			skip(msg, len);
 			size += len;
-			if(msg->pos > msg->end)
+			if(msg->error)
 				return;
 		}
 		msg->pos = s;
@@ -241,8 +249,8 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
  * malloc(3) allocated buffer with the contents of the buffer at
  * P<msg>->pos.  In either case, P<msg>->pos is advanced by the
  * number of bytes read or written. If the action would advance
- * P<msg>->pos beyond P<msg>->end, P<msg>->pos is still advanced
- * but no other action is taken.
+ * P<msg>->pos beyond P<msg>->end, P<msg>->error is set and no
+ * other action is taken.
  *
  * See also:
  *	T<IxpMsg>, F<ixp_pstring>
@@ -292,10 +300,10 @@ ixp_pqids(IxpMsg *msg, uint16_t *num, IxpQid qid[], uint max) {
 	int i;
 
 	ixp_pu16(msg, num);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 	if(*num > max) {
-		msg->pos = msg->end+1;
+		msg->error = 1;
 		return;
 	}
 
@@ -308,9 +316,10 @@ ixp_pstat(IxpMsg *msg, IxpStat *stat) {
 	uint16_t size = 0;
 
 	if(msg->mode == MsgPack)
-		size = ixp_sizeof_stat(stat) - 2;
+		size = ixp_sizeof_stat(stat, msg->version) - 2;
 
 	ixp_pu16(msg, &size);
+
 	ixp_pu16(msg, &stat->type);
 	ixp_pu32(msg, &stat->dev);
 	ixp_pqid(msg, &stat->qid);
@@ -322,4 +331,11 @@ ixp_pstat(IxpMsg *msg, IxpStat *stat) {
 	ixp_pstring(msg, &stat->uid);
 	ixp_pstring(msg, &stat->gid);
 	ixp_pstring(msg, &stat->muid);
+
+	if(msg->version == IXP_V9P2000U) {
+		ixp_pstring(msg, &stat->extension);
+		ixp_pu32(msg, &stat->n_uid);
+		ixp_pu32(msg, &stat->n_gid);
+		ixp_pu32(msg, &stat->n_muid);
+	}
 }
