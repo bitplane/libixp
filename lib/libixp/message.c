@@ -31,8 +31,8 @@ enum {
  * while P<end> points to the end of the message. The packing
  * functions advance P<pos> as they go, always ensuring that
  * they don't read or write past P<end>.  When a message is
- * entirely packed or unpacked, P<pos> whould be less than or
- * equal to P<end>. Any other state indicates error.
+ * entirely packed or unpacked, P<error> is zero. A nonzero value
+ * indicates that a conversion exceeded the message bounds.
  *
  * ixp_message is a convenience function to pack a construct an
  * IxpMsg from a buffer of a given P<length> and a given
@@ -52,6 +52,7 @@ ixp_message(char *data, uint length, uint mode) {
 	m.end = data + length;
 	m.size = length;
 	m.mode = mode;
+	m.error = 0;
 	return m;
 }
 
@@ -79,6 +80,33 @@ ixp_freestat(IxpStat *s) {
 void
 ixp_freefcall(IxpFcall *fcall) {
 	switch(fcall->hdr.type) {
+	case TAuth:
+		free(fcall->tauth.uname);
+		free(fcall->tauth.aname);
+		fcall->tauth.uname = fcall->tauth.aname = nil;
+		break;
+	case TAttach:
+		free(fcall->tattach.uname);
+		free(fcall->tattach.aname);
+		fcall->tattach.uname = fcall->tattach.aname = nil;
+		break;
+	case TWalk:
+		if(fcall->twalk.nwname)
+			free(fcall->twalk.wname[0]);
+		fcall->twalk.nwname = 0;
+		break;
+	case TCreate:
+		free(fcall->tcreate.name);
+		free(fcall->tcreate.extension);
+		fcall->tcreate.name = fcall->tcreate.extension = nil;
+		break;
+	case TWrite:
+		free(fcall->twrite.data);
+		fcall->twrite.data = nil;
+		break;
+	case TWStat:
+		ixp_freestat(&fcall->twstat.stat);
+		break;
 	case RStat:
 		free(fcall->rstat.stat);
 		fcall->rstat.stat = nil;
@@ -87,6 +115,7 @@ ixp_freefcall(IxpFcall *fcall) {
 		free(fcall->rread.data);
 		fcall->rread.data = nil;
 		break;
+	case TVersion:
 	case RVersion:
 		free(fcall->version.version);
 		fcall->version.version = nil;
@@ -94,10 +123,6 @@ ixp_freefcall(IxpFcall *fcall) {
 	case RError:
 		free(fcall->error.ename);
 		fcall->error.ename = nil;
-		break;
-	case TCreate:
-		free(fcall->tcreate.extension);
-		fcall->tcreate.extension = nil;
 		break;
 	}
 }
@@ -215,7 +240,7 @@ ixp_pfcall(IxpMsg *msg, IxpFcall *fcall) {
 		ixp_pdata(msg, (char**)&fcall->rstat.stat, fcall->rstat.nstat);
 		break;
 	case TWStat: {
-		uint16_t size;
+		uint16_t size = 0;
 		ixp_pu32(msg, &fcall->hdr.fid);
 		ixp_pu16(msg, &size);
 		ixp_pstat(msg, &fcall->twstat.stat);
@@ -242,12 +267,15 @@ uint
 ixp_fcall2msg(IxpMsg *msg, IxpFcall *fcall) {
 	uint32_t size;
 
+	if(msg->size < SDWord)
+		return 0;
 	msg->end = msg->data + msg->size;
 	msg->pos = msg->data + SDWord;
 	msg->mode = MsgPack;
+	msg->error = 0;
 	ixp_pfcall(msg, fcall);
 
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return 0;
 
 	msg->end = msg->pos;
@@ -262,13 +290,15 @@ ixp_fcall2msg(IxpMsg *msg, IxpFcall *fcall) {
 
 uint
 ixp_msg2fcall(IxpMsg *msg, IxpFcall *fcall) {
+	if(msg->size < SDWord || msg->end < msg->data + SDWord)
+		return 0;
 	msg->pos = msg->data + SDWord;
 	msg->mode = MsgUnpack;
+	msg->error = 0;
 	ixp_pfcall(msg, fcall);
 
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return 0;
 
 	return msg->pos - msg->data;
 }
-

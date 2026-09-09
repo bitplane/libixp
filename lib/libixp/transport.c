@@ -75,6 +75,7 @@ ixp_sendmsg(int fd, IxpMsg *msg) {
 	int r;
 
 	msg->pos = msg->data;
+	msg->error = 0;
 	while(msg->pos < msg->end) {
 		r = thread->write(fd, msg->pos, msg->end - msg->pos);
 		if(r < 1) {
@@ -96,14 +97,19 @@ ixp_recvmsg(int fd, IxpMsg *msg) {
 	msg->mode = MsgUnpack;
 	msg->pos = msg->data;
 	msg->end = msg->data + msg->size;
+	msg->error = 0;
 	if(readn(fd, msg, SSize) != SSize)
 		return 0;
 
 	msg->pos = msg->data;
 	ixp_pu32(msg, &msize);
 
+	if(msize < SSize) {
+		werrstr("message too small");
+		return 0;
+	}
 	size = msize - SSize;
-	if(size >= msg->end - msg->pos) {
+	if(size > (uint)(msg->end - msg->pos)) {
 		werrstr("message too large");
 		return 0;
 	}
@@ -115,4 +121,3 @@ ixp_recvmsg(int fd, IxpMsg *msg) {
 	msg->end = msg->pos;
 	return msize;
 }
-

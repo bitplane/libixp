@@ -30,8 +30,8 @@
  * of libixp with a different API version than it was compiled
  * against.
  */
-#define IXP_API 136
-#define _IXP_ASSERT_VERSION ixp_version_ ## 136 ## _required
+#define IXP_API 137
+#define _IXP_ASSERT_VERSION ixp_version_ ## 137 ## _required
 
 #ifndef IXP_NEEDAPI
 #define IXP_NEEDAPI IXP_API
@@ -301,6 +301,7 @@ struct IxpMsg {
 	uint	size; /* Size of buffer. */
 	uint	mode; /* MsgPack or MsgUnpack. */
 	uint	version; /* IXP_V9P2000 or IXP_V9P2000U. */
+	uint	error; /* A conversion exceeded the message bounds. */
 };
 
 struct IxpQid {
@@ -832,4 +833,3 @@ char*	ixp_namespace(void);
 char*	ixp_smprint(const char*, ...);
 uint	ixp_strlcat(char*, const char*, uint);
 uint	ixp_tokenize(char**, uint len, char*, char);
-
