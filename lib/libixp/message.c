@@ -224,7 +224,7 @@ ixp_pfcall(IxpMsg *msg, IxpFcall *fcall) {
 		ixp_pdata(msg, (char**)&fcall->rstat.stat, fcall->rstat.nstat);
 		break;
 	case TWStat: {
-		uint16_t size;
+		uint16_t size = 0;
 		ixp_pu32(msg, &fcall->hdr.fid);
 		ixp_pu16(msg, &size);
 		ixp_pstat(msg, &fcall->twstat.stat);
