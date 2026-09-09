@@ -195,7 +195,7 @@ xcreate(int argc, char *argv[]) {
 	if(fid == nil)
 		fatal("Can't create file '%s': %s\n", file, ixp_errbuf());
 
-	if((fid->qid.type&P9_DMDIR) == 0)
+	if((fid->qid.type&P9_QTDIR) == 0)
 		write_data(fid, file);
 
 	return 0;
@@ -286,12 +286,19 @@ xls(int argc, char *argv[]) {
 	buf = emalloc(fid->iounit);
 	while((count = ixp_read(fid, buf, fid->iounit)) > 0) {
 		m = ixp_message(buf, count, MsgUnpack);
-		while(m.pos < m.end) {
+		m.version = client->version;
+		while(!m.error && m.pos < m.end) {
 			if(nstat == mstat) {
 				mstat <<= 1;
 				stat = ixp_erealloc(stat, sizeof(*stat) * mstat);
 			}
-			ixp_pstat(&m, &stat[nstat++]);
+			memset(&stat[nstat], 0, sizeof stat[nstat]);
+			ixp_pstat(&m, &stat[nstat]);
+			if(m.error) {
+				ixp_freestat(&stat[nstat]);
+				fatal("cannot decode directory '%s'\n", file);
+			}
+			nstat++;
 		}
 	}
 

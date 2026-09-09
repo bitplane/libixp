@@ -1,2 +1,17 @@
 These tests require plan9port.
 
+The standalone TWStat wire-length regression test does not require plan9port.
+From the repository root, after running make:
+
+    cc -Iinclude -o test/twstat.out test/twstat.c lib/libixp.a
+    ./test/twstat.out
+
+UNIX extension regression checks (no plan9port required):
+
+    python3 test/unix-client.py
+    cc -Iinclude -o test/unix-readdir.out test/unix-readdir.c lib/libixp.a
+    ./test/unix-readdir.out
+
+The client check uses an independent local peer for directory decoding and
+version negotiation. The helper check captures replies to verify entry sizes
+and continuation offsets in both protocol versions.

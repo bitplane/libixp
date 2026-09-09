@@ -364,6 +364,7 @@ ixp_pending_write(IxpPending *pending, const char *dat, long ndat) {
 	IxpQueue **qp, *queue;
 	IxpPendingLink *pp;
 	IxpRequestLink *rp;
+	Ixp9Req *req;
 
 	if(ndat == 0)
 		return;
@@ -396,8 +397,15 @@ ixp_pending_write(IxpPending *pending, const char *dat, long ndat) {
 	req_link.prev->next = &req_link;
 	req_link.next->prev = &req_link;
 
-	while((rp = req_link.next) != &req_link)
-		ixp_pending_respond(rp->req);
+	while(req_link.next != &req_link) {
+		rp = req_link.next;
+		rp->next->prev = rp->prev;
+		rp->prev->next = rp->next;
+		req = rp->req;
+		req->aux = nil;
+		free(rp);
+		ixp_pending_respond(req);
+	}
 }
 
 int
@@ -577,14 +585,20 @@ ixp_srv_readdir(Ixp9Req *req, IxpLookupFn lookup, void (*dostat)(IxpStat*, IxpFi
 		size = req->fid->iounit;
 	buf = emallocz(size);
 	msg = ixp_message(buf, size, MsgPack);
+	msg.version = ixp_req_getversion(req);
 
 	file = lookup(file, nil);
 	tfile = file;
 	/* Note: The first file is ".", so we skip it. */
 	offset = 0;
 	for(file=file->next; file; file=file->next) {
+		memset(&stat, 0, sizeof stat);
+		stat.extension = "";
+		stat.n_uid = ~0U;
+		stat.n_gid = ~0U;
+		stat.n_muid = ~0U;
 		dostat(&stat, file);
-		n = ixp_sizeof_stat(&stat);
+		n = ixp_sizeof_stat(&stat, msg.version);
 		if(offset >= req->ifcall.io.offset) {
 			if(size < n)
 				break;
