@@ -35,6 +35,14 @@ enum {
 	EPLAN9 = 0x19283745,
 };
 
+static void
+copyerr(char *dst, int ndst, const char *src) {
+	if(ndst <= 0)
+		return;
+	strncpy(dst, src, ndst - 1);
+	dst[ndst - 1] = '\0';
+}
+
 /**
  * Function: ixp_errbuf
  * Function: ixp_errstr
@@ -76,9 +84,9 @@ ixp_errbuf() {
 
 	errbuf = thread->errbuf();
 	if(errno == EINTR)
-		strncpy(errbuf, "interrupted", IXP_ERRMAX);
+		copyerr(errbuf, IXP_ERRMAX, "interrupted");
 	else if(errno != EPLAN9)
-		strncpy(errbuf, strerror(errno), IXP_ERRMAX);
+		copyerr(errbuf, IXP_ERRMAX, strerror(errno));
 	return errbuf;
 }
 
@@ -86,15 +94,15 @@ void
 errstr(char *buf, int nbuf) {
 	char tmp[IXP_ERRMAX];
 
-	strncpy(tmp, buf, sizeof tmp);
+	copyerr(tmp, sizeof tmp, buf);
 	rerrstr(buf, nbuf);
-	strncpy(thread->errbuf(), tmp, IXP_ERRMAX);
+	copyerr(thread->errbuf(), IXP_ERRMAX, tmp);
 	errno = EPLAN9;
 }
 
 void
 rerrstr(char *buf, int nbuf) {
-	strncpy(buf, ixp_errbuf(), nbuf);
+	copyerr(buf, nbuf, ixp_errbuf());
 }
 
 void
@@ -105,7 +113,7 @@ werrstr(const char *fmt, ...) {
 	va_start(ap, fmt);
 	ixp_vsnprint(tmp, sizeof tmp, fmt, ap);
 	va_end(ap);
-	strncpy(thread->errbuf(), tmp, IXP_ERRMAX);
+	tmp[sizeof tmp - 1] = '\0';
+	copyerr(thread->errbuf(), IXP_ERRMAX, tmp);
 	errno = EPLAN9;
 }
-
