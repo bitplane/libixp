@@ -62,6 +62,7 @@ struct Ixp9Conn {
 	IxpMsg		rmsg;
 	IxpMsg		wmsg;
 	int		ref;
+	uint		version;
 };
 
 static void
@@ -130,6 +131,7 @@ handlefcall(IxpConn *c) {
 	thread->lock(&p9conn->rlock);
 	if(ixp_recvmsg(c->fd, &p9conn->rmsg) == 0)
 		goto Fail;
+	p9conn->rmsg.version = p9conn->version;
 	if(ixp_msg2fcall(&p9conn->rmsg, &fcall) == 0)
 		goto Fail;
 	if(fcall.hdr.type == TVersion && fcall.version.msize < MIN_MSIZE) {
@@ -175,12 +177,19 @@ handlereq(Ixp9Req *r) {
 		ixp_respond(r, Enofunc);
 		break;
 	case TVersion:
-		if(!strcmp(r->ifcall.version.version, "9P"))
-			r->ofcall.version.version = "9P";
-		else if(!strcmp(r->ifcall.version.version, "9P2000"))
+		if(!strcmp(r->ifcall.version.version, "9P2000.u")) {
+			r->ofcall.version.version = "9P2000.u";
+			p9conn->version = IXP_V9P2000U;
+		} else if(!strcmp(r->ifcall.version.version, "9P2000")) {
 			r->ofcall.version.version = "9P2000";
-		else
+			p9conn->version = IXP_V9P2000;
+		} else if(!strcmp(r->ifcall.version.version, "9P")) {
+			r->ofcall.version.version = "9P";
+			p9conn->version = IXP_V9P2000;
+		} else {
 			r->ofcall.version.version = "unknown";
+			p9conn->version = IXP_V9P2000;
+		}
 		r->ofcall.version.msize = r->ifcall.version.msize;
 		ixp_respond(r, nil);
 		break;
@@ -427,6 +436,7 @@ ixp_respond(Ixp9Req *req, const char *error) {
 			req->fid->qid = req->ofcall.ropen.qid;
 		}
 		free(req->ifcall.tcreate.name);
+		free(req->ifcall.tcreate.extension);
 		break;
 	case TWalk:
 		if(error || req->ofcall.rwalk.nwqid < req->ifcall.twalk.nwname) {
@@ -482,6 +492,7 @@ ixp_respond(Ixp9Req *req, const char *error) {
 
 	if(p9conn->conn) {
 		thread->lock(&p9conn->wlock);
+		p9conn->wmsg.version = p9conn->version;
 		msize = ixp_fcall2msg(&p9conn->wmsg, &req->ofcall);
 		if(msize == 0 ||
 		   ixp_sendmsg(p9conn->conn->fd, &p9conn->wmsg) != msize)
@@ -499,6 +510,11 @@ ixp_respond(Ixp9Req *req, const char *error) {
 	}
 	free(req);
 	decref_p9conn(p9conn);
+}
+
+uint
+ixp_req_getversion(Ixp9Req *req) {
+	return req->conn->version;
 }
 
 /* Flush a pending request */

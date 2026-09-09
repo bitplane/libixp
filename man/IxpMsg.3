@@ -18,11 +18,18 @@ struct IxpMsg {
         char*   end;  /* End of message. */ 
         uint    size; /* Size of buffer. */
         uint    mode; /* MsgPack or MsgUnpack. */
+        uint    version; /* IXP_V9P2000 or IXP_V9P2000U. */
+        uint8_t error; /* A conversion exceeded the message bounds. */
 }
 
 enum IxpMsgMode {
         MsgPack,
         MsgUnpack,
+}
+
+enum IxpVersion {
+        IXP_V9P2000,
+        IXP_V9P2000U,
 }
 
 IxpMsg ixp_message(char *data, uint length, uint mode);
@@ -39,9 +46,8 @@ wire format. The location and size of a buffer are stored in
 location in the message currently being packed or unpacked,
 while \fIend\fR points to the end of the message. The packing
 functions advance \fIpos\fR as they go, always ensuring that
-they don't read or write past \fIend\fR.  When a message is
-entirely packed or unpacked, \fIpos\fR whould be less than or
-equal to \fIend\fR. Any other state indicates error.
+they don't read or write past \fIend\fR. If a conversion would
+exceed the message bounds, \fIerror\fR is set to a nonzero value.
 
 .P
 ixp_message is a convenience function to pack a construct an
