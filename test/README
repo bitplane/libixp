@@ -1,2 +1,7 @@
 These tests require plan9port.
 
+The standalone TWStat wire-length regression test does not require plan9port.
+From the repository root, after running make:
+
+    cc -Iinclude -o test/twstat.out test/twstat.c lib/libixp.a
+    ./test/twstat.out
