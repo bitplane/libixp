@@ -17,7 +17,8 @@ enum {
 
 static int
 available(IxpMsg *msg, uint size) {
-	return msg->pos <= msg->end && size <= (uint)(msg->end - msg->pos);
+	return !msg->error && msg->pos <= msg->end
+		&& size <= (uint)(msg->end - msg->pos);
 }
 
 static void
@@ -25,7 +26,7 @@ skip(IxpMsg *msg, uint size) {
 	if(available(msg, size))
 		msg->pos += size;
 	else
-		msg->pos = msg->end + 1;
+		msg->error = 1;
 }
 
 static void
@@ -133,7 +134,7 @@ ixp_pu64(IxpMsg *msg, uint64_t *val) {
  * string packed at P<msg>->pos. In either case, P<msg>->pos is
  * advanced by the number of bytes read or written. If the
  * action would advance P<msg>->pos beyond P<msg>->end,
- * P<msg>->pos is still advanced but no other action is taken.
+ * P<msg>->error is set and no other action is taken.
  *
  * See also:
  *	T<IxpMsg>, F<ixp_pstrings>, F<ixp_pdata>
@@ -145,7 +146,7 @@ ixp_pstring(IxpMsg *msg, char **s) {
 	if(msg->mode == MsgPack)
 		len = strlen(*s);
 	ixp_pu16(msg, &len);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 
 	if(available(msg, len)) {
@@ -175,10 +176,9 @@ ixp_pstring(IxpMsg *msg, char **s) {
  * and P<(*strings)[0]> must be freed by the user. In either
  * case, P<msg>->pos is advanced by the number of bytes read or
  * written. If the action would advance P<msg>->pos beyond
- * P<msg>->end, P<msg>->pos is still advanced, but no other
- * action is taken. If P<*num> is greater than P<max>,
- * P<msg>->pos is set beyond P<msg>->end and no other action is
- * taken.
+ * P<msg>->end, P<msg>->error is set and no other action is
+ * taken. If P<*num> is greater than P<max>, P<msg>->error is
+ * set and no other action is taken.
  * 
  * See also:
  *	P<IxpMsg>, P<ixp_pstring>, P<ixp_pdata>
@@ -190,10 +190,10 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
 	uint16_t len;
 
 	ixp_pu16(msg, num);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 	if(*num > max) {
-		msg->pos = msg->end+1;
+		msg->error = 1;
 		return;
 	}
 
@@ -206,7 +206,7 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
 			ixp_pu16(msg, &len);
 			skip(msg, len);
 			size += len;
-			if(msg->pos > msg->end)
+			if(msg->error)
 				return;
 		}
 		msg->pos = s;
@@ -241,8 +241,8 @@ ixp_pstrings(IxpMsg *msg, uint16_t *num, char *strings[], uint max) {
  * malloc(3) allocated buffer with the contents of the buffer at
  * P<msg>->pos.  In either case, P<msg>->pos is advanced by the
  * number of bytes read or written. If the action would advance
- * P<msg>->pos beyond P<msg>->end, P<msg>->pos is still advanced
- * but no other action is taken.
+ * P<msg>->pos beyond P<msg>->end, P<msg>->error is set and no
+ * other action is taken.
  *
  * See also:
  *	T<IxpMsg>, F<ixp_pstring>
@@ -292,10 +292,10 @@ ixp_pqids(IxpMsg *msg, uint16_t *num, IxpQid qid[], uint max) {
 	int i;
 
 	ixp_pu16(msg, num);
-	if(msg->pos > msg->end)
+	if(msg->error)
 		return;
 	if(*num > max) {
-		msg->pos = msg->end+1;
+		msg->error = 1;
 		return;
 	}
 
