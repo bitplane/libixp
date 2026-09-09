@@ -52,6 +52,7 @@ ixp_message(char *data, uint length, uint mode) {
 	m.end = data + length;
 	m.size = length;
 	m.mode = mode;
+	m.version = IXP_V9P2000;
 	m.error = 0;
 	return m;
 }
