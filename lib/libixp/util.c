@@ -1,6 +1,7 @@
 /* Written by Kris Maglione <maglione.k at Gmail> */
 /* Public domain */
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,8 +72,9 @@ rmkdir(char *path, int mode) {
 static char*
 ns_display(void) {
 	char *path, *disp;
-	struct stat st;
+	struct stat lst, st;
 	size_t length;
+	int fd;
 
 	disp = getenv("DISPLAY");
 	if(disp == nil || disp[0] == '\0') {
@@ -88,17 +90,29 @@ ns_display(void) {
 
 	path = ixp_smprint("/tmp/ns.%s.%s", ixp_getuser(), disp);
 	free(disp);
+	fd = -1;
 
 	if(!rmkdir(path, 0700))
 		;
-	else if(stat(path, &st))
+	else if(lstat(path, &lst))
 		ixp_werrstr("Can't stat Namespace path '%s': %s", path, ixp_errbuf());
-	else if(getuid() != st.st_uid)
+	else if(!S_ISDIR(lst.st_mode))
+		ixp_werrstr("Namespace path '%s' is not a directory", path);
+	else if(getuid() != lst.st_uid)
 		ixp_werrstr("Namespace path '%s' exists but is not owned by you", path);
-	else if((st.st_mode & 077) && chmod(path, st.st_mode & ~077))
+	else if((fd = open(path, O_RDONLY)) < 0)
+		ixp_werrstr("Can't open Namespace path '%s': %s", path, ixp_errbuf());
+	else if(fstat(fd, &st) || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino
+	     || !S_ISDIR(st.st_mode) || getuid() != st.st_uid)
+		ixp_werrstr("Namespace path '%s' changed while opening it", path);
+	else if((st.st_mode & 077) && fchmod(fd, st.st_mode & ~(mode_t)077))
 		ixp_werrstr("Namespace path '%s' exists, but has wrong permissions: %s", path, ixp_errbuf());
-	else
+	else {
+		close(fd);
 		return path;
+	}
+	if(fd >= 0)
+		close(fd);
 	free(path);
 	return nil;
 }

@@ -43,8 +43,10 @@ ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
 			case SDWord:
 				pos[3] = v>>24;
 				pos[2] = v>>16;
+				/* fall through */
 			case SWord:
 				pos[1] = v>>8;
+				/* fall through */
 			case SByte:
 				pos[0] = v;
 				break;
@@ -56,8 +58,10 @@ ixp_puint(IxpMsg *msg, uint size, uint32_t *val) {
 			case SDWord:
 				v |= (uint32_t)pos[3]<<24;
 				v |= pos[2]<<16;
+				/* fall through */
 			case SWord:
 				v |= pos[1]<<8;
+				/* fall through */
 			case SByte:
 				v |= pos[0];
 				break;
