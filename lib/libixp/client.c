@@ -457,10 +457,11 @@ _stat(IxpClient *c, ulong fid) {
 
 	msg = ixp_message((char*)fcall.rstat.stat, fcall.rstat.nstat, MsgUnpack);
 
-	stat = emalloc(sizeof *stat);
+	stat = emallocz(sizeof *stat);
 	ixp_pstat(&msg, stat);
 	ixp_freefcall(&fcall);
-	if(msg.pos > msg.end) {
+	if(msg.error) {
+		ixp_freestat(stat);
 		free(stat);
 		stat = nil;
 	}
